@@ -16,3 +16,14 @@ Eventually the data is pickled into `dna.pkl` with protocol 2.
 ChIP-seq peak conservative calls are collected per range and per
 protein-cell combination in a 3D-tensor. The data is then pickled into
 `chip.conservative.pkl` with protocol 2.
+
+For experiments with only one protein (currently the only experiment
+supported) one can generate a protein-cell specific dataset by running
+`python3 pick_chip.py --cell X --protein Y`, where X and Y are the
+indices of both properties in the original tensor.
+
+
+## Training
+One can start training on a specific protein-cell pair by running
+`python3 train.py --epochs E --chip-path chip-X-Y.conservative.pkl`.
+Check `python3 train.py --help` for additional training options.
