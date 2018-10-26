@@ -1,2 +1,4 @@
 .env
 *.pkl
+.idea/*
+__pycache__/*
