@@ -2,3 +2,5 @@
 *.pkl
 .idea/*
 __pycache__/*
+*.model
+*.log
