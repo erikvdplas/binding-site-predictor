@@ -12,6 +12,8 @@ import optparse
 import sys
 import os
 import data
+import random
+import functools
 
 
 SAVE_PATH = 'bspredictor.model'
@@ -35,13 +37,21 @@ if __name__ == '__main__':
     parser.add_option("--chip-path", action='store', dest='chip_path', type='str',
                       help='Determines location of pickled ChIP data file.')
     parser.add_option("--save-interval", action='store', dest='save_interval', type='int',
-                      help='Determines after how many batches the model will be saved.', default=50)
+                      help='Determines after how many batches the model will be saved.', default=1000)
+    parser.add_option("--batch-size", action='store', dest='batch_size', type='int',
+                      help='Determines batch size.', default=8)
     (params, _) = parser.parse_args(sys.argv)
 
     if params.needs_seed:
+        print('Seeding random')
+        random.seed(1)
         torch.manual_seed(1)
 
     model = BSPredictor(hidden_size=128)
+
+    if torch.cuda.device_count() > 1:
+        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        model = nn.DataParallel(model)
 
     if os.path.exists(SAVE_PATH):
         print('Loading pre-trained model')
@@ -50,21 +60,56 @@ if __name__ == '__main__':
     loss_function = LogLoss()
     optimizer = optim.Adam(model.parameters())
 
-    batches = data.load_batches(params.chip_path, 8, 2)
+    test_part = 0.2
+    dataset = data.BSDataset(params.chip_path, params.batch_size, test_part=test_part)
+
+    # batch_size * adjacent_len * first_num_underneath should be >>1000, so ATM 5 should be 2^(8-10)
+    epoch_size = 512 * int(1 / test_part)
+
+    training_iter = 0
 
     for epoch in range(params.epochs):
         print('Training epoch %d' % epoch)
 
-        for batch_idx, (input, target) in enumerate(batches): # Pseudocode
-            if (epoch * len(batches) + batch_idx) % params.save_interval == 0:
-                print('Saving model at epoch %d \t batch %d' % (epoch, batch_idx))
+        for train_batch in dataset.load_batches(int(epoch_size * (1 - test_part))) :
+            if training_iter % params.save_interval == 0:
+                print('Saving model at epoch %d \t training iter %d' % (epoch, training_iter))
                 torch.save(model.state_dict(), SAVE_PATH)
 
             model.zero_grad()
+            model.reset_hidden_states(batch_size=params.batch_size)
 
-            prediction = model(var(input))
+            (leading_input, trailing_input, target) = train_batch
+            prediction = model(var(leading_input), var(trailing_input))
 
             loss = loss_function(prediction, var(target))
-            print(loss.data)
-            loss.backward(retain_graph=True)
+
+            print(loss.data.item())
+
+            with open('train-loss.log', 'a') as f:
+                f.write(str(loss.data.item()) + '\n')
+
+            loss.backward()
             optimizer.step()
+
+            training_iter += 1
+
+        with torch.no_grad():
+            test_losses = []
+
+            for test_batch in dataset.load_batches(int(epoch_size * test_part), test=True):
+                (leading_input, trailing_input, target) = test_batch
+                prediction = model(var(leading_input), var(trailing_input))
+
+                loss = loss_function(prediction, var(target))
+                test_losses.append(loss.data.item())
+
+            average_loss = float(functools.reduce(lambda x,y: x + y, test_losses)) / float(len(test_losses))
+
+            print('Test loss: \t %f' % average_loss)
+
+            with open('test-loss.log', 'a') as f:
+                f.write(str(average_loss) + '\n')
+
+            dataset.test_offset = 0
+
