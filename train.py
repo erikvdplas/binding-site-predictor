@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser.add_option("--save-interval", action='store', dest='save_interval', type='int',
                       help='Determines after how many batches the model will be saved.', default=1000)
     parser.add_option("--batch-size", action='store', dest='batch_size', type='int',
-                      help='Determines batch size.', default=8)
+                      help='Determines batch size.', default=128)
     (params, _) = parser.parse_args(sys.argv)
 
     if params.needs_seed:
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     model = BSPredictor(hidden_size=128)
 
     if torch.cuda.device_count() > 1:
-        print("Let's use", torch.cuda.device_count(), "GPUs!")
+        print("Using %d GPUs for data parallelism" % torch.cuda.device_count())
         model = nn.DataParallel(model)
 
     if os.path.exists(SAVE_PATH):
@@ -71,7 +71,9 @@ if __name__ == '__main__':
     for epoch in range(params.epochs):
         print('Training epoch %d' % epoch)
 
-        for train_batch in dataset.load_batches(int(epoch_size * (1 - test_part))) :
+        train_losses = []
+
+        for train_batch in dataset.load_batches(int(epoch_size * (1 - test_part))):
             if training_iter % params.save_interval == 0:
                 print('Saving model at epoch %d \t training iter %d' % (epoch, training_iter))
                 torch.save(model.state_dict(), SAVE_PATH)
@@ -83,16 +85,17 @@ if __name__ == '__main__':
             prediction = model(var(leading_input), var(trailing_input))
 
             loss = loss_function(prediction, var(target))
-
-            print(loss.data.item())
-
-            with open('train-loss.log', 'a') as f:
-                f.write(str(loss.data.item()) + '\n')
+            train_losses.append(loss.data.item())
 
             loss.backward()
             optimizer.step()
 
             training_iter += 1
+
+        average_loss = float(functools.reduce(lambda x, y: x + y, train_losses)) / float(len(train_losses))
+        print('Average train loss: \t %f' % average_loss)
+        with open('train-loss.log', 'a') as f:
+            f.write(str(average_loss) + '\n')
 
         with torch.no_grad():
             test_losses = []
@@ -106,7 +109,7 @@ if __name__ == '__main__':
 
             average_loss = float(functools.reduce(lambda x,y: x + y, test_losses)) / float(len(test_losses))
 
-            print('Test loss: \t %f' % average_loss)
+            print('Average test loss: \t %f' % average_loss)
 
             with open('test-loss.log', 'a') as f:
                 f.write(str(average_loss) + '\n')

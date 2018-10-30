@@ -1,13 +1,12 @@
 # Torch imports
 import torch
-from torch.utils.data import Dataset, DataLoader
 
 # Utility imports
 import joblib
 import os
-import math
 import numpy as np
 import random
+import joblib
 
 DREAM_DATA_PATH = os.environ['DREAM_DATA'] if 'DREAM_DATA' in os.environ else ''
 
@@ -20,7 +19,13 @@ def save_array(array, path):
 def dream_array(dream_path):
     return array(DREAM_DATA_PATH + dream_path)
 
+def unpack_dna():
+    dna_raw = dream_array('dna.pkl')
+    unpacked = np.unpackbits(dna_raw, -1)
+    joblib.dump(unpacked, 'dna_unpacked.pkl', protocol=2)
+
 class BSDataset:
+
     SEQ_STRIDE = 50
     SEQ_LEN = 200
 
@@ -28,12 +33,12 @@ class BSDataset:
         self.adjacent_length = adjacent_length
 
         self.peaks_raw = array(chip_path)
-        p_len = len(self.peaks_raw)
-        self.dna_raw = dream_array('dna.pkl')
+        self.peaks_len = len(self.peaks_raw)
+        self.dna_raw = dream_array('dna_unpacked.pkl')
         self.batch_size = batch_size
         self.train_offset = 0
 
-        total_chunks = int(p_len / self.adjacent_length)
+        total_chunks = int(self.peaks_len / self.adjacent_length)
 
         self.test_indices = [[i * self.adjacent_length + j for j in range(self.adjacent_length)]
                              for i in random.sample(range(total_chunks), int(total_chunks * test_part))]
@@ -55,22 +60,20 @@ class BSDataset:
 
         for i in range(number * self.batch_size * self.adjacent_length):
             if test:
-                if self.test_offset >= len(self.peaks_raw):
+                if self.test_offset >= self.peaks_len:
                     self.test_offset = 0
                 while self.test_offset not in self.test_indices:
-                    self.test_offset += 1
+                    self.test_offset += self.adjacent_length
                 peaks.append(self.peaks_raw[self.test_offset])
-                print(self.test_indices)
-                dna.append(np.unpackbits(np.array(self.dna_raw[self.test_offset]), -1))
+                dna.append(self.dna_raw[self.test_offset])
                 self.test_offset += 1
             else:
-                if self.train_offset >= len(self.peaks_raw):
+                if self.train_offset >= self.peaks_len:
                     self.train_offset = 0
                 while self.train_offset in self.test_indices:
-                    self.train_offset += 1
+                    self.train_offset += self.adjacent_length
                 peaks.append(self.peaks_raw[self.train_offset])
-                print(self.train_offset)
-                dna.append(np.unpackbits(np.array(self.dna_raw[self.train_offset]), -1))
+                dna.append(self.dna_raw[self.train_offset])
                 self.train_offset += 1
 
         batches = []
@@ -90,7 +93,7 @@ class BSDataset:
                     dna_arr_l = dna[final_offset]
                     dna_arr_t = dna_arr_l
 
-                    MAX_LEADS = int(self.SEQ_LEN / self.SEQ_STRIDE)
+                    MAX_LEADS = min(int(self.SEQ_LEN / self.SEQ_STRIDE), 2)
 
                     # Gather leading items
                     for li in range(min(MAX_LEADS, ai)):
@@ -111,7 +114,7 @@ class BSDataset:
                 l_dna_batch = torch.cat(l_dna_seq)
                 t_dna_batch = torch.cat(t_dna_seq)
 
-                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
                 peak_batch = peak_batch.view((1, self.batch_size, 1)).float().to(device)       # (seq_len, batch, input_size)
                 l_dna_batch = l_dna_batch.transpose(0, 2).transpose(1, 2).float().to(device)   # (seq_len, batch, input_size)
