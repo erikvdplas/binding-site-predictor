@@ -2,11 +2,11 @@
 import torch
 
 # Utility imports
-import joblib
 import os
 import numpy as np
 import random
 import joblib
+import time
 
 DREAM_DATA_PATH = os.environ['DREAM_DATA'] if 'DREAM_DATA' in os.environ else ''
 
@@ -22,7 +22,7 @@ def dream_array(dream_path):
 def unpack_dna():
     dna_raw = dream_array('dna.pkl')
     unpacked = np.unpackbits(dna_raw, -1)
-    joblib.dump(unpacked, 'dna_unpacked.pkl', protocol=2)
+    joblib.dump(unpacked, DREAM_DATA_PATH + 'dna_unpacked.pkl', protocol=2)
 
 class BSDataset:
 
@@ -40,16 +40,19 @@ class BSDataset:
 
         total_chunks = int(self.peaks_len / self.adjacent_length)
 
-        self.test_indices = [[i * self.adjacent_length + j for j in range(self.adjacent_length)]
-                             for i in random.sample(range(total_chunks), int(total_chunks * test_part))]
-        self.test_indices = [item for sublist in self.test_indices for item in sublist]     # Flatten
-        self.validate_test_indices()
+        self.test_indices = sorted([i * adjacent_length for i in random.sample(range(total_chunks), int(total_chunks * test_part))])
+        # print(self.test_indices[:1000])
+        # self.validate_test_indices()
+
+        self.test_count = len(self.test_indices)
+        self.test_arr_offset = 0
+        self.train_arr_offset = 0
 
         self.test_offset = 0
 
     def validate_test_indices(self):
         alternatives = []
-        for index in self.test_indices[:(16*8*512)]:
+        for index in self.test_indices[:(16*16*512)]:
             if self.peaks_raw[index] != 0:
                 alternatives.append(self.peaks_raw[index])
         print(len(alternatives))
@@ -58,23 +61,63 @@ class BSDataset:
         peaks = []
         dna = []
 
-        for i in range(number * self.batch_size * self.adjacent_length):
+        # print(number * self.batch_size * self.adjacent_length)
+
+        # start = time.clock()
+
+        while len(peaks) < number * self.batch_size * self.adjacent_length:
             if test:
-                if self.test_offset >= self.peaks_len:
+                if self.test_arr_offset == self.test_count:
+                    self.test_arr_offset = 0
                     self.test_offset = 0
-                while self.test_offset not in self.test_indices:
+
+                while self.test_indices[self.test_arr_offset] != self.test_offset:
                     self.test_offset += self.adjacent_length
-                peaks.append(self.peaks_raw[self.test_offset])
-                dna.append(self.dna_raw[self.test_offset])
-                self.test_offset += 1
+                    if self.test_offset >= self.peaks_len:
+                        self.test_offset = 0
+
+                start_index = self.test_offset
+                end_index = self.test_offset + self.adjacent_length
+
+                while self.test_indices[self.test_arr_offset + 1] == end_index:
+                    end_index += self.adjacent_length
+                    self.test_arr_offset += 1
+
+                self.test_offset = end_index + self.adjacent_length     # Immediately skipping non-test fragment
+
+                # print('Picking %d - %d' % (start_index, end_index - 1))
+                peaks += list(self.peaks_raw[start_index:end_index])
+                dna += list(self.dna_raw[start_index:end_index])
+
+                self.test_arr_offset += 1
             else:
-                if self.train_offset >= self.peaks_len:
-                    self.train_offset = 0
-                while self.train_offset in self.test_indices:
+                while self.test_indices[self.train_arr_offset] == self.train_offset:
                     self.train_offset += self.adjacent_length
-                peaks.append(self.peaks_raw[self.train_offset])
-                dna.append(self.dna_raw[self.train_offset])
-                self.train_offset += 1
+                    self.train_arr_offset += 1
+                    if self.train_arr_offset == self.test_count:
+                        self.train_arr_offset = 0
+
+                start_index = self.train_offset
+                end_index = self.train_offset + self.adjacent_length
+
+                while self.test_indices[self.train_arr_offset] != end_index and end_index < self.peaks_len:
+                    end_index += self.adjacent_length
+
+                if end_index <= self.peaks_len:
+                    self.train_offset = end_index
+
+                    # print('Picking %d - %d' % (start_index, end_index - 1))
+                    peaks += list(self.peaks_raw[start_index:end_index])
+                    dna += list(self.dna_raw[start_index:end_index])
+                else:
+                    self.train_offset = 0
+                    self.train_arr_offset = 0
+
+        peaks = peaks[:number * self.batch_size * self.adjacent_length]
+        dna = dna[:number * self.batch_size * self.adjacent_length]
+
+        # print(time.clock() - start)
+        # start = time.clock()
 
         batches = []
         for ni in range(number):
@@ -121,5 +164,7 @@ class BSDataset:
                 t_dna_batch = t_dna_batch.transpose(0, 2).transpose(1, 2).float().to(device)   # (seq_len, batch, input_size)
 
                 batches.append((l_dna_batch, t_dna_batch, peak_batch))
+
+        # print(time.clock() - start)
 
         return batches

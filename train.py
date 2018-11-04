@@ -39,7 +39,7 @@ if __name__ == '__main__':
     parser.add_option("--save-interval", action='store', dest='save_interval', type='int',
                       help='Determines after how many batches the model will be saved.', default=1000)
     parser.add_option("--batch-size", action='store', dest='batch_size', type='int',
-                      help='Determines batch size.', default=128)
+                      help='Determines batch size.', default=16)
     (params, _) = parser.parse_args(sys.argv)
 
     if params.needs_seed:
