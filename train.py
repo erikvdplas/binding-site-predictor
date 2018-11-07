@@ -120,4 +120,5 @@ if __name__ == '__main__':
                 f.write(str(average_loss) + '\n')
 
             dataset.test_offset = 0
+            data.test_arr_offset = 0
 
