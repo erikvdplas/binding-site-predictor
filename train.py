@@ -57,6 +57,9 @@ if __name__ == '__main__':
         print('Loading pre-trained model')
         model.load_state_dict(torch.load(SAVE_PATH))
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
     loss_function = LogLoss()
     optimizer = optim.Adam(model.parameters())
 
@@ -82,6 +85,7 @@ if __name__ == '__main__':
             model.reset_hidden_states(batch_size=params.batch_size)
 
             (leading_input, trailing_input, target) = train_batch
+            (leading_input, trailing_input, target) = (leading_input.to(device), trailing_input.to(device), target.to(device))
             prediction = model(var(leading_input), var(trailing_input))
 
             loss = loss_function(prediction, var(target))
@@ -102,6 +106,7 @@ if __name__ == '__main__':
 
             for test_batch in dataset.load_batches(int(epoch_size * test_part), test=True):
                 (leading_input, trailing_input, target) = test_batch
+                (leading_input, trailing_input, target) = (leading_input.to(device), trailing_input.to(device), target.to(device))
                 prediction = model(var(leading_input), var(trailing_input))
 
                 loss = loss_function(prediction, var(target))

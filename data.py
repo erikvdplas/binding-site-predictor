@@ -157,11 +157,9 @@ class BSDataset:
                 l_dna_batch = torch.cat(l_dna_seq)
                 t_dna_batch = torch.cat(t_dna_seq)
 
-                device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-                peak_batch = peak_batch.view((1, self.batch_size, 1)).float().to(device)       # (seq_len, batch, input_size)
-                l_dna_batch = l_dna_batch.transpose(0, 2).transpose(1, 2).float().to(device)   # (seq_len, batch, input_size)
-                t_dna_batch = t_dna_batch.transpose(0, 2).transpose(1, 2).float().to(device)   # (seq_len, batch, input_size)
+                peak_batch = peak_batch.view((1, self.batch_size, 1)).float()       # (seq_len, batch, input_size)
+                l_dna_batch = l_dna_batch.transpose(0, 2).transpose(1, 2).float()   # (seq_len, batch, input_size)
+                t_dna_batch = t_dna_batch.transpose(0, 2).transpose(1, 2).float()   # (seq_len, batch, input_size)
 
                 batches.append((l_dna_batch, t_dna_batch, peak_batch))
 
