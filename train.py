@@ -82,7 +82,7 @@ if __name__ == '__main__':
                 torch.save(model.state_dict(), SAVE_PATH)
 
             model.zero_grad()
-            model.reset_hidden_states(batch_size=params.batch_size)
+            model.module.reset_hidden_states(batch_size=params.batch_size)
 
             (leading_input, trailing_input, target) = train_batch
             (leading_input, trailing_input, target) = (leading_input.to(device), trailing_input.to(device), target.to(device))
