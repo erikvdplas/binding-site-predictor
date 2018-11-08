@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     if torch.cuda.device_count() > 1:
         print("Using %d GPUs for data parallelism" % torch.cuda.device_count())
-        model = nn.DataParallel(model)
+        model = nn.DataParallel(model, dim=1)
 
     if os.path.exists(SAVE_PATH):
         print('Loading pre-trained model')

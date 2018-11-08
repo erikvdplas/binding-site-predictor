@@ -26,14 +26,14 @@ class BSPredictor(nn.Module):
 
 
     def reset_hidden_states(self, batch_size=1, for_batch=None):
-        if for_batch:
+        if for_batch is not None:
             batch_size = for_batch.shape[1]
 
         # Initialize recurrent hidden states
         self.rl_h = self.init_hidden(batch_size=batch_size)
         self.rlr_h = self.init_hidden(batch_size=batch_size)
 
-        if for_batch:
+        if for_batch is not None:
             device = for_batch.device
             self.rl_h = self.rl_h.to(device)
             self.rlr_h = self.rlr_h.to(device)
