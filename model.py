@@ -46,7 +46,10 @@ class BSPredictor(nn.Module):
     def forward(self, leading_dna, trailing_dna):
         self.reset_hidden_states(for_batch=leading_dna)
 
+        self.rl.flatten_parameters()
         rl_out, self.rl_h = self.rl(leading_dna, self.rl_h)
+
+        self.rlr.flatten_parameters()
         rlr_out, self.rlr_h = self.rlr(self.flip_input(trailing_dna), self.rlr_h)
 
         r_out = torch.cat((self.rl_h[1], self.rlr_h[1]), 1)
@@ -58,5 +61,6 @@ class BSPredictor(nn.Module):
 
 
     def flip_input(self, input):
-        flipped_array = np.flip(input.data.numpy(), 0).copy()
-        return var(torch.from_numpy(flipped_array))
+        device = input.device
+        flipped_array = np.flip(input.data.cpu().numpy(), 0).copy()
+        return var(torch.from_numpy(flipped_array).to(device))
