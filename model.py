@@ -25,10 +25,18 @@ class BSPredictor(nn.Module):
         self.reset_hidden_states()
 
 
-    def reset_hidden_states(self, batch_size=1):
+    def reset_hidden_states(self, batch_size=1, for_batch=None):
+        if for_batch:
+            batch_size = for_batch.shape[1]
+
         # Initialize recurrent hidden states
         self.rl_h = self.init_hidden(batch_size=batch_size)
         self.rlr_h = self.init_hidden(batch_size=batch_size)
+
+        if for_batch:
+            device = for_batch.device
+            self.rl_h = self.rl_h.to(device)
+            self.rlr_h = self.rlr_h.to(device)
 
 
     def init_hidden(self, batch_size=1):
@@ -36,6 +44,8 @@ class BSPredictor(nn.Module):
 
 
     def forward(self, leading_dna, trailing_dna):
+        self.reset_hidden_states(for_batch=leading_dna)
+
         rl_out, self.rl_h = self.rl(leading_dna, self.rl_h)
         rlr_out, self.rlr_h = self.rlr(self.flip_input(trailing_dna), self.rlr_h)
 
