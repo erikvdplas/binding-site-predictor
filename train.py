@@ -25,7 +25,7 @@ class LogLoss(nn.Module):
 
     def forward(self, x, y):
         losses = y * torch.log(x) + (1 - y) * torch.log(1 - x)
-        return -torch.mean(losses)
+        return -torch.mean(losses).unsqueeze(0)
 
 
 if __name__ == '__main__':
