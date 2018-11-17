@@ -58,7 +58,7 @@ if __name__ == '__main__':
         model = nn.DataParallel(model, dim=1)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model.cuda()
+    model = model.to(device)
 
     loss_function = LogLoss()
     optimizer = optim.Adam(model.parameters())
@@ -84,7 +84,7 @@ if __name__ == '__main__':
             model.zero_grad()
 
             (leading_input, trailing_input, target) = train_batch
-            (leading_input, trailing_input, target) = (leading_input.cuda(), trailing_input.cuda(), target.cuda())
+            (leading_input, trailing_input, target) = (leading_input.to(device), trailing_input.to(device), target.to(device))
             prediction = model(var(leading_input), var(trailing_input))
 
             loss = loss_function(prediction, var(target))
@@ -105,7 +105,7 @@ if __name__ == '__main__':
 
             for test_batch in dataset.load_batches(int(epoch_size * test_part), test=True):
                 (leading_input, trailing_input, target) = test_batch
-                (leading_input, trailing_input, target) = (leading_input.cuda(), trailing_input.cuda(), target.cuda())
+                (leading_input, trailing_input, target) = (leading_input.to(device), trailing_input.to(device), target.to(device))
                 prediction = model(var(leading_input), var(trailing_input))
 
                 loss = loss_function(prediction, var(target))
