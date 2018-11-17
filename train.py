@@ -89,8 +89,8 @@ if __name__ == '__main__':
             (leading_input, trailing_input, target) = (leading_input.to(device), trailing_input.to(device), target.to(device))
             prediction = model(var(leading_input), var(trailing_input))
 
-            loss = loss_function(prediction, var(target))
-            train_losses.append(torch.mean(loss.data).item())
+            loss = torch.mean(loss_function(prediction, var(target)))
+            train_losses.append(loss.data.item())
 
             loss.backward()
             optimizer.step()
@@ -110,8 +110,8 @@ if __name__ == '__main__':
                 (leading_input, trailing_input, target) = (leading_input.to(device), trailing_input.to(device), target.to(device))
                 prediction = model(var(leading_input), var(trailing_input))
 
-                loss = loss_function(prediction, var(target))
-                test_losses.append(torch.mean(loss.data).item())
+                loss = torch.mean(loss_function(prediction, var(target)))
+                test_losses.append(loss.data.item())
 
             average_loss = float(functools.reduce(lambda x,y: x + y, test_losses)) / float(len(test_losses))
 
