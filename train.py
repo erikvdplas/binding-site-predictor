@@ -50,10 +50,6 @@ if __name__ == '__main__':
     model = BSPredictor(hidden_size=128)
     loss_function = LogLoss()
 
-    if os.path.exists(SAVE_PATH):
-        print('Loading pre-trained model')
-        model.load_state_dict(torch.load(SAVE_PATH))
-
     if torch.cuda.device_count() > 1:
         print("Using %d GPUs for data parallelism" % torch.cuda.device_count())
         model = nn.DataParallel(model, dim=1)
@@ -62,6 +58,10 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     loss_function = loss_function.to(device)
+
+    if os.path.exists(SAVE_PATH):
+        print('Loading pre-trained model')
+        model.load_state_dict(torch.load(SAVE_PATH))
 
     optimizer = optim.Adam(model.parameters())
 
